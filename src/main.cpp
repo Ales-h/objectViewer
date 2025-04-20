@@ -6,6 +6,8 @@
 #include <chrono>
 #include <iostream>
 
+#include "errorReporting.h"
+
 static const char* kVertexShaderSrc = R"glsl(
 #version 330 core
 layout(location = 0) in vec2 aPos;
@@ -63,11 +65,13 @@ int main(int argc, char** argv) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << "\n";
         return -1;
     }
+    SDL_Init(SDL_INIT_VIDEO);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 
     SDL_Window* window =
         SDL_CreateWindow("SDL3 + GLAD Test",                       // title
@@ -88,6 +92,13 @@ int main(int argc, char** argv) {
     if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
         std::cerr << "Failed to initialize GLAD\n";
         return -1;
+    }
+
+    if (GLAD_GL_KHR_debug || GLAD_GL_ARB_debug_output) {
+        enableReportGlErrors();
+    } else {
+        std::cerr << "No KHR_debug/ARB_debug_output support. "
+                     "Falling back to glGetError wrappers.\n";
     }
 
     std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << "\n";
@@ -151,4 +162,3 @@ int main(int argc, char** argv) {
     SDL_Quit();
     return 0;
 }
-
