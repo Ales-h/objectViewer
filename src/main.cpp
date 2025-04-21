@@ -1,7 +1,5 @@
-// src/main.cpp
-
-#include <SDL3/SDL.h>
-#include <glad/glad.h>
+#include "SDL3/SDL.h"
+#include "glad/glad.h"
 
 #include <chrono>
 #include <iostream>
@@ -25,7 +23,7 @@ static const char* kFragmentShaderSrc = R"glsl(
 #version 330 core
 out vec4 FragColor;
 void main() {
-    FragColor = vec4(1.0, 0.5, 0.1, 1.0);
+    FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }
 )glsl";
 
@@ -94,6 +92,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // if debugging is available (OpenGL 4.3 is ussualy required for this)
     if (GLAD_GL_KHR_debug || GLAD_GL_ARB_debug_output) {
         enableReportGlErrors();
     } else {
