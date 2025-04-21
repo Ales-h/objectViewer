@@ -7,4 +7,3 @@ build/
 CMakeSettings.json
 Makefile
 .cache
-compile_commands.json
