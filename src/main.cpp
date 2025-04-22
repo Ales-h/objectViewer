@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "errorReporting.h"
+#include "vertexBuffer.h"
 
 static const char* kVertexShaderSrc = R"glsl(
 #version 330 core
@@ -110,12 +111,11 @@ int main(int argc, char** argv) {
     glDeleteShader(fs);
 
     float triVerts[] = {0.0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f};
-    GLuint vao, vbo;
+    GLuint vao;
     glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
+
+    vertexBuffer vbo = vertexBuffer(triVerts, sizeof(triVerts));
     glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triVerts), triVerts, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
     glBindVertexArray(0);
