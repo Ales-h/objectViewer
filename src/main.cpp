@@ -1,4 +1,3 @@
-// src/main.cpp
 
 #include <SDL3/SDL.h>
 #include <glad/glad.h>
@@ -8,6 +7,7 @@
 
 #include "errorReporting.h"
 #include "vertexBuffer.h"
+#include "vertexArray.h"
 
 static const char* kVertexShaderSrc = R"glsl(
 #version 330 core
@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
@@ -111,14 +111,14 @@ int main(int argc, char** argv) {
     glDeleteShader(fs);
 
     float triVerts[] = {0.0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f};
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
+    vertexArray vao;
+
 
     vertexBuffer vbo = vertexBuffer(triVerts, sizeof(triVerts));
-    glBindVertexArray(vao);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
-    glBindVertexArray(0);
+    vertexLayout layout;
+    layout.push<float>(2);
+    vao.addBuffer(vbo, layout);
+    vao.unbind();
 
     bool running = true;
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
         GLint loc = glGetUniformLocation(program, "uAngle");
         glUniform1f(loc, s);
 
-        glBindVertexArray(vao);
+        vao.bind();
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         SDL_GL_SwapWindow(window);
