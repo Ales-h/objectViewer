@@ -2,18 +2,18 @@
 
 #include "vertexArray.h"
 
-#include "vertexLayout.h"
 #include "vertexBuffer.h"
+#include "vertexLayout.h"
 
 class vertexArray {
-private:
+  private:
     unsigned int m_id;
 
-public:
+  public:
     vertexArray();
     ~vertexArray();
 
-    void addBuffer(vertexBuffer &vb, const vertexLayout& layout);
+    void addBuffer(vertexBuffer &vb, const vertexLayout &layout);
     void bind() const;
     void unbind() const;
 };

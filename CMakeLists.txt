@@ -19,6 +19,7 @@ target_include_directories(objectViewer
 
 target_compile_definitions(
   objectViewer PUBLIC RESOURCES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/resources/")
+#target_compile_definitions("$CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="./resources/")
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /permissive-)
