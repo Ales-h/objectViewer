@@ -2,65 +2,19 @@
 #include "glad/glad.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
-#include "tiny_obj_loader.h"
 
 #include <filesystem>
 #include <iostream>
 
+#include "GLprogram.h"
 #include "errorReporting.h"
+#include "fileloader.h"
 #include "indexBuffer.h"
+#include "shader.h"
 #include "vertexArray.h"
 #include "vertexBuffer.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-
-static const char *defaultVertexShaderSrc = R"glsl(
-#version 330 core
-layout(location = 0) in vec3 position;
-uniform mat4 uMVP;
-void main() {
-    gl_Position = uMVP * vec4(position/2, 1.0);
-}
-)glsl";
-
-static const char *kFragmentShaderSrc = R"glsl(
-#version 330 core
-out vec4 FragColor;
-void main() {
-    FragColor = vec4(1.0, 0.5, 0.1, 0.2);
-}
-)glsl";
-
-static GLuint CompileShader(GLenum type, const char *src) {
-    GLuint s = glCreateShader(type);
-    glShaderSource(s, 1, &src, nullptr);
-    glCompileShader(s);
-    GLint ok = 0;
-    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-    if (!ok) {
-        char buf[512];
-        glGetShaderInfoLog(s, 512, nullptr, buf);
-        std::cerr << "Shader compile error: " << buf << "\n";
-        std::exit(-1);
-    }
-    return s;
-}
-
-static GLuint LinkProgram(GLuint vs, GLuint fs) {
-    GLuint p = glCreateProgram();
-    glAttachShader(p, vs);
-    glAttachShader(p, fs);
-    glLinkProgram(p);
-    GLint ok = 0;
-    glGetProgramiv(p, GL_LINK_STATUS, &ok);
-    if (!ok) {
-        char buf[512];
-        glGetProgramInfoLog(p, 512, nullptr, buf);
-        std::cerr << "Program link error: " << buf << "\n";
-        std::exit(-1);
-    }
-    return p;
-}
 
 int main(int argc, char **argv) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
@@ -108,40 +62,13 @@ int main(int argc, char **argv) {
 
     std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << "\n";
 
-    // path to model
-    std::filesystem::path obj_path(RESOURCES_PATH "cube.obj");
+    std::filesystem::path obj_path(RESOURCES_PATH "icosphere.obj");
     std::filesystem::path mtl_path(RESOURCES_PATH "cube.mtl");
 
-    // loading the model
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string warning, err;
-
-    bool success = tinyobj::LoadObj(&attrib, &shapes, &materials, &warning, &err,
-                                    obj_path.string().c_str(), nullptr);
-    if (!err.empty()) {
-        std::cerr << err << "\n";
-    }
-    if (!success) {
-        std::cerr << "model loading failed!!\n";
-        assert(true);
-    }
     std::vector<glm::vec3> vertices;
     std::vector<unsigned int> indices;
 
-    // loading vertices
-    for (int i = 0; i < attrib.vertices.size(); i += 3) {
-        vertices.emplace_back(glm::vec3{attrib.vertices[i], attrib.vertices[i + 1],
-                                        attrib.vertices[i + 2]});
-    }
-
-    tinyobj::shape_t shape = shapes[0];
-    auto data = shape.mesh.indices;
-
-    for (int i = 0; i < data.size(); i++) {
-        indices.emplace_back(data[i].vertex_index);
-    }
+    fileloader::loadObjMesh(vertices, indices, obj_path.string());
 
     vertexArray vao_cube;
 
@@ -155,13 +82,17 @@ int main(int argc, char **argv) {
     ibo_cube.bind();
     vao_cube.unbind();
 
-    GLuint vs = CompileShader(GL_VERTEX_SHADER, defaultVertexShaderSrc);
-    GLuint fs = CompileShader(GL_FRAGMENT_SHADER, kFragmentShaderSrc);
-    GLuint program = LinkProgram(vs, fs);
-    glDeleteShader(vs);
-    glDeleteShader(fs);
+    std::filesystem::path vertex_path(RESOURCES_PATH "shaders/defaultVertex.glsl");
+    std::filesystem::path fragment_path(RESOURCES_PATH "shaders/frag.glsl");
 
-    GLint locMVP = glGetUniformLocation(program, "uMVP");
+    GLprogram program;
+
+    { // scope so the shaders delete
+        shader vertex_shader(GL_VERTEX_SHADER, vertex_path.string());
+        shader fragment_shader(GL_FRAGMENT_SHADER, fragment_path.string());
+
+        program.createProgram(vertex_shader.getId(), fragment_shader.getId());
+    }
 
     bool running = true;
     auto t0 = SDL_GetTicks();
@@ -185,7 +116,6 @@ int main(int argc, char **argv) {
             }
         }
 
-
         glm::mat4 proj =
             glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 10.0f);
         // parameters: camera position, where are we looking, which way is up axis
@@ -201,8 +131,8 @@ int main(int argc, char **argv) {
         glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(program);
-        glUniformMatrix4fv(locMVP, 1, GL_FALSE, &MVP[0][0]);
+        program.bind();
+        program.setUniformMat4f("uMVP", MVP);
 
         vao_cube.bind();
         glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, nullptr);
