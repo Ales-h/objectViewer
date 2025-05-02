@@ -20,12 +20,8 @@ unsigned int GLprogram::createProgram(unsigned int vs, unsigned int fs) {
     return m_id;
 }
 
-void GLprogram::bind() const {
-    glUseProgram(m_id);
-}
-void GLprogram::unbind() const {
-    glUseProgram(0);
-}
+void GLprogram::bind() const { glUseProgram(m_id); }
+void GLprogram::unbind() const { glUseProgram(0); }
 
 void GLprogram::setUniform4f(const std::string &name, float v0, float v1, float v2,
                              float v3) const {
@@ -34,6 +30,12 @@ void GLprogram::setUniform4f(const std::string &name, float v0, float v1, float 
 void GLprogram::setUniformMat4f(const std::string &name, const glm::mat4 &matrix) const {
     glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, &matrix[0][0]);
 }
+
+void GLprogram::setUniform3f(const std::string &name, float v0, float v1,
+                             float v2) const {
+    glUniform3f(getUniformLocation(name), v0, v1, v2);
+}
+
 void GLprogram::setUniform1f(const std::string &name, float v) const {
     glUniform1f(getUniformLocation(name), v);
 }

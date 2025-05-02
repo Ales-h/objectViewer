@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
     }
 
     glEnable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << "\n";
@@ -65,37 +66,56 @@ int main(int argc, char **argv) {
     std::filesystem::path obj_path(RESOURCES_PATH "icosphere.obj");
     std::filesystem::path mtl_path(RESOURCES_PATH "cube.mtl");
 
-    std::vector<glm::vec3> vertices;
+    std::vector<fileloader::vertex> vertices;
     std::vector<unsigned int> indices;
 
     fileloader::loadObjMesh(vertices, indices, obj_path.string());
+
+    for(auto vertex : vertices){
+        std::cout << " position:" << vertex.p.x << ' ' << vertex.p.y << ' ' << vertex.p.z << ' ';
+        std::cout << " normals:" << vertex.n.x << ' ' << vertex.n.y << ' ' << vertex.n.z << '\n';
+    }
 
     vertexArray vao_cube;
 
     vertexBuffer vbo_cube =
         vertexBuffer(vertices.data(), vertices.size() * sizeof(vertices[0]));
-    indexBuffer ibo_cube = indexBuffer(indices.data(), indices.size());
+    //indexBuffer ibo_cube = indexBuffer(indices.data(), indices.size());
 
     vertexLayout layout_cube;
     layout_cube.push<float>(3);
+    layout_cube.push<float>(3);
+    layout_cube.push<float>(2);
     vao_cube.addBuffer(vbo_cube, layout_cube);
-    ibo_cube.bind();
     vao_cube.unbind();
 
-    std::filesystem::path vertex_path(RESOURCES_PATH "shaders/defaultVertex.glsl");
-    std::filesystem::path fragment_path(RESOURCES_PATH "shaders/frag.glsl");
+    std::filesystem::path vertex_path(RESOURCES_PATH "shaders/DiffuseVertex.glsl");
+    std::filesystem::path fragment_path(RESOURCES_PATH "shaders/ambientShaderFrag.glsl");
+    std::filesystem::path light_fragment_path(RESOURCES_PATH "shaders/lightFrag.glsl");
 
     GLprogram program;
+    GLprogram light_program;
 
     { // scope so the shaders delete
         shader vertex_shader(GL_VERTEX_SHADER, vertex_path.string());
         shader fragment_shader(GL_FRAGMENT_SHADER, fragment_path.string());
+        shader light_fragment_shader(GL_FRAGMENT_SHADER, light_fragment_path.string());
 
         program.createProgram(vertex_shader.getId(), fragment_shader.getId());
+        light_program.createProgram(vertex_shader.getId(), light_fragment_shader.getId());
     }
 
     bool running = true;
     auto t0 = SDL_GetTicks();
+
+    glm::vec3 lightPos(0.7f, 0.5f, 0.4f);
+
+    glm::mat4 light_proj = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 10.0f);
+    glm::mat4 light_view =
+        glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    glm::mat4 light_model = glm::translate(glm::mat4(1.0f), lightPos);
+    light_model = glm::scale(light_model, glm::vec3(0.2));
+
 
     while (running) {
         SDL_Event ev;
@@ -125,17 +145,33 @@ int main(int argc, char **argv) {
         float t = (tNow - t0) / 1000.0f;
         // parameters:model(if we already did some transformations, angle, rotation axis
         glm::mat4 model = glm::rotate(glm::mat4(1.0f), t, glm::vec3(1, 1, 1));
+        model = glm::scale(model, glm::vec3(0.5));
 
-        glm::mat4 MVP = proj * view * model;
+        //glm::mat4 MVP = proj * view * model;
 
         glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         program.bind();
-        program.setUniformMat4f("uMVP", MVP);
+        program.setUniformMat4f("projection", proj);
+        program.setUniformMat4f("view", view);
+        program.setUniformMat4f("model", model);
+        // white light
+        program.setUniform3f("lightColor", 1.0f, 1.0f, 1.0f);
+        program.setUniform3f("lightPos", lightPos.x, lightPos.y, lightPos.z);
 
         vao_cube.bind();
-        glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, nullptr);
+        glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+        //glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, nullptr);
+
+        light_program.bind();
+        light_program.setUniformMat4f("projection", light_proj);
+        light_program.setUniformMat4f("view", light_view);
+        light_program.setUniformMat4f("model", light_model);
+
+        vao_cube.bind();
+        glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+        //glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, nullptr);
 
         SDL_GL_SwapWindow(window);
     }

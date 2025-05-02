@@ -6,16 +6,28 @@
 
 namespace fileloader {
 
-void verticesToVec3(const std::vector<float>& data,
-                        std::vector<glm::vec3> &vertices) {
+void loadVertices(const std::vector<float> &positions, const std::vector<float> &norm,
+                  const std::vector<float> &uvs, std::vector<vertex> &vertices) {
+    size_t vertices_count = positions.size() / 3;
+    std::cout << "positions count: " << positions.size() / 3 << '\n';
+    std::cout << "normals count: " << norm.size() / 3 << '\n';
 
-    for (int i = 0; i < data.size(); i += 3) {
-        vertices.emplace_back(glm::vec3{data[i], data[i + 1],
-                                        data[i + 2]});
+    glm::vec3 normal = glm::vec3{0, 0, 0};
+    glm::vec2 uv = glm::vec2{0, 0};
+    for (int i = 0; i < vertices_count; i++) {
+        glm::vec3 pos =
+            glm::vec3{positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]};
+        if (norm.size() >= 3 * (i + 1)) {
+            normal = glm::vec3{norm[i * 3], norm[i * 3 + 1], norm[i * 3 + 2]};
+        }
+        if (uvs.size() >= 2 * (i + 1)) {
+            uv = glm::vec2{uvs[i * 2], uvs[i * 2 + 1]};
+        }
+        vertices.emplace_back(vertex{pos, normal, uv});
     }
 }
 
-void loadObjMesh(std::vector<glm::vec3> &vertices, std::vector<unsigned int> &indices,
+void loadObjMesh(std::vector<vertex> &vertices, std::vector<unsigned int> &indices,
                  const std::string &obj_path) {
 
     // loading the model
@@ -34,18 +46,27 @@ void loadObjMesh(std::vector<glm::vec3> &vertices, std::vector<unsigned int> &in
         std::exit(-1);
     }
 
+    auto pos = attrib.vertices;
+    auto norm = attrib.normals;
+    auto uvs = attrib.texcoords;
     // loading vertices
-    verticesToVec3(attrib.vertices, vertices);
-    for (int i = 0; i < attrib.vertices.size(); i += 3) {
-        vertices.emplace_back(glm::vec3{attrib.vertices[i], attrib.vertices[i + 1],
-                                        attrib.vertices[i + 2]});
-    }
-
-    tinyobj::shape_t shape = shapes[0];
-    auto data = shape.mesh.indices;
-
-    for (int i = 0; i < data.size(); i++) {
-        indices.emplace_back(data[i].vertex_index);
+    for (auto shape : shapes) {
+        auto mesh = shape.mesh;
+        for (auto idx : mesh.indices) {
+            int p_idx = idx.vertex_index * 3;
+            int n_idx = idx.normal_index * 3;
+            int uv_idx = idx.texcoord_index * 2;
+            glm::vec3 p = glm::vec3(pos[p_idx], pos[p_idx + 1], pos[p_idx + 2]);
+            glm::vec3 n = glm::vec3(0, 0, 0);
+            if (norm.size() > n_idx) {
+                n = glm::vec3(norm[n_idx], norm[n_idx + 1], norm[n_idx + 2]);
+            }
+            glm::vec2 uv = glm::vec2(0, 0);
+            if (uvs.size() > uv_idx) {
+                uv = glm::vec2(uvs[uv_idx], uvs[uv_idx + 1]);
+            }
+            vertices.push_back(vertex{p, n, uv});
+        }
     }
 }
 

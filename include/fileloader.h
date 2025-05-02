@@ -7,10 +7,15 @@
 
 namespace fileloader {
 
+struct vertex {
+    glm::vec3 p;
+    glm::vec3 n;
+    glm::vec2 uv;
+};
 
-
-// loads just the vertices and indices to create the mesh (no materials, normals etc.)
-void loadObjMesh(std::vector<glm::vec3> &vertices, std::vector<unsigned int> &indices,
+// loads just the vertices and indices to create the mesh (no materials)
+void loadObjMesh(std::vector<vertex> &vertices, std::vector<unsigned int> &indices,
                  const std::string &obj_path);
+
 
 } // namespace fileloader
