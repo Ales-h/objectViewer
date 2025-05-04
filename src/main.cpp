@@ -1,4 +1,5 @@
 #include "SDL3/SDL.h"
+#include "SDL3/SDL_events.h"
 #include "glad/glad.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -15,6 +16,12 @@
 #include "vertexBuffer.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
+
+struct camera {
+    float yaw = 0.0f;
+    float pitch = 0.0f;
+    float radius = 2.0f;
+};
 
 int main(int argc, char **argv) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
@@ -71,16 +78,18 @@ int main(int argc, char **argv) {
 
     fileloader::loadObjMesh(vertices, indices, obj_path.string());
 
-    for(auto vertex : vertices){
-        std::cout << " position:" << vertex.p.x << ' ' << vertex.p.y << ' ' << vertex.p.z << ' ';
-        std::cout << " normals:" << vertex.n.x << ' ' << vertex.n.y << ' ' << vertex.n.z << '\n';
+    for (auto vertex : vertices) {
+        std::cout << " position:" << vertex.p.x << ' ' << vertex.p.y << ' ' << vertex.p.z
+                  << ' ';
+        std::cout << " normals:" << vertex.n.x << ' ' << vertex.n.y << ' ' << vertex.n.z
+                  << '\n';
     }
 
     vertexArray vao_cube;
 
     vertexBuffer vbo_cube =
         vertexBuffer(vertices.data(), vertices.size() * sizeof(vertices[0]));
-    //indexBuffer ibo_cube = indexBuffer(indices.data(), indices.size());
+    // indexBuffer ibo_cube = indexBuffer(indices.data(), indices.size());
 
     vertexLayout layout_cube;
     layout_cube.push<float>(3);
@@ -109,14 +118,11 @@ int main(int argc, char **argv) {
     auto t0 = SDL_GetTicks();
 
     glm::vec3 lightPos(0.7f, 0.5f, 0.4f);
+    glm::vec3 viewPos = glm::vec3(0, 0, 2);
+    camera cam = {0, 0, 2};
+    const float sensitivity = 0.005f;
 
-    glm::mat4 light_proj = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 10.0f);
-    glm::mat4 light_view =
-        glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    glm::mat4 light_model = glm::translate(glm::mat4(1.0f), lightPos);
-    light_model = glm::scale(light_model, glm::vec3(0.2));
-
-
+    bool rotating = false;
     while (running) {
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
@@ -131,23 +137,66 @@ int main(int argc, char **argv) {
             case SDL_EVENT_WINDOW_RESIZED:
                 glViewport(0, 0, ev.window.data1, ev.window.data2);
                 break;
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (ev.button.button == SDL_BUTTON_LEFT) {
+                    rotating = true;
+                }
+                break;
+            case SDL_EVENT_MOUSE_BUTTON_UP:
+                if (ev.button.button == SDL_BUTTON_LEFT) {
+                    rotating = false;
+                }
+                break;
+            case SDL_EVENT_MOUSE_MOTION: {
+                if (rotating) {
+                    float dx = ev.motion.xrel * sensitivity;
+                    float dy = ev.motion.yrel * sensitivity;
+                    cam.yaw -= dx;
+                    cam.pitch += dy;
+                    constexpr float limit = glm::radians(89.0f);
+                    cam.pitch = glm::clamp(cam.pitch, -limit, limit);
+                }
+
+                break;
+            }
+            case SDL_EVENT_MOUSE_WHEEL: {
+                Sint32 dy = ev.wheel.y;
+                if (dy > 0) {
+                    cam.radius += dy * -0.1;
+                } else if (dy < 0) {
+                    cam.radius += dy * -0.1;
+                }
+                break;
+            }
             default:
                 break;
             }
         }
 
+        viewPos = {cam.radius * cosf(cam.pitch) * sinf(cam.yaw),
+                   cam.radius * sinf(cam.pitch),
+                   cam.radius * cosf(cam.pitch) * cosf(cam.yaw)};
+
+        glm::mat4 light_proj =
+            glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 10.0f);
+        glm::mat4 light_view =
+            glm::lookAt(viewPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        glm::mat4 light_model = glm::translate(glm::mat4(1.0f), lightPos);
+        light_model = glm::scale(light_model, glm::vec3(0.2));
+        glm::mat4 inv_light_model = glm::inverse(light_model);
+
         glm::mat4 proj =
             glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 10.0f);
         // parameters: camera position, where are we looking, which way is up axis
-        glm::mat4 view =
-            glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        glm::mat4 view = glm::lookAt(viewPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
         Uint32 tNow = SDL_GetTicks();
         float t = (tNow - t0) / 1000.0f;
         // parameters:model(if we already did some transformations, angle, rotation axis
         glm::mat4 model = glm::rotate(glm::mat4(1.0f), t, glm::vec3(1, 1, 1));
         model = glm::scale(model, glm::vec3(0.5));
+        glm::mat4 inv_model = glm::inverse(model);
 
-        //glm::mat4 MVP = proj * view * model;
+        // glm::mat4 MVP = proj * view * model;
 
         glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -156,22 +205,27 @@ int main(int argc, char **argv) {
         program.setUniformMat4f("projection", proj);
         program.setUniformMat4f("view", view);
         program.setUniformMat4f("model", model);
+        program.setUniformMat4f("inverseModel", inv_model);
         // white light
         program.setUniform3f("lightColor", 1.0f, 1.0f, 1.0f);
         program.setUniform3f("lightPos", lightPos.x, lightPos.y, lightPos.z);
+        program.setUniform3f("viewPos", viewPos.x, viewPos.y, viewPos.z);
 
         vao_cube.bind();
         glDrawArrays(GL_TRIANGLES, 0, vertices.size());
-        //glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, nullptr);
+        // glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT,
+        // nullptr);
 
         light_program.bind();
         light_program.setUniformMat4f("projection", light_proj);
         light_program.setUniformMat4f("view", light_view);
         light_program.setUniformMat4f("model", light_model);
+        program.setUniformMat4f("inverseModel", inv_light_model);
 
         vao_cube.bind();
         glDrawArrays(GL_TRIANGLES, 0, vertices.size());
-        //glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, nullptr);
+        // glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT,
+        // nullptr);
 
         SDL_GL_SwapWindow(window);
     }
